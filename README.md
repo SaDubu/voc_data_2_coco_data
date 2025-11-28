@@ -21,3 +21,4 @@ needs Training, Validation Folder
 
 https://aihub.or.kr/aihubdata/data/view.do?pageIndex=1&currMenu=115&topMenu=100&srchOptnCnd=OPTNCND001&searchKeyword=%EA%B3%BC%EC%9E%90&srchDetailCnd=DETAILCND001&srchOrder=ORDER001&srchPagePer=20&aihubDataSe=data&dataSetSn=64
 Tested using the dataset from the above link.
+
