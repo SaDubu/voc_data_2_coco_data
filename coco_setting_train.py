@@ -2,6 +2,12 @@ import os
 import shutil
 import tempfile
 
+import cv2
+import os
+import glob
+
+from PIL import Image
+
 BASE_DIR = './Training' 
 # 2. XML 파일 입력 폴더
 LABEL_ROOT_DIR = os.path.join(BASE_DIR, 'label_coco') 
@@ -26,7 +32,7 @@ V_SOURCE_DIR = os.path.join(V_BASE_DIR, 'image')
 # 대상 경로: image_coco 폴더 (BASE_DIR과 동일 레벨에 생성/사용)
 V_TARGET_DIR = os.path.join('./images', 'valid')
 
-def cp_file(origin_path, mv_path, filename_list):
+def cp_file(origin_path, mv_path):
     # 대상 폴더가 없으면 생성합니다.
     os.makedirs(mv_path, exist_ok=True)
     print(f"대상 폴더: '{mv_path}' 준비 완료.")
@@ -52,7 +58,6 @@ def cp_file(origin_path, mv_path, filename_list):
                 total_copied += 1
                 # 진행 상황을 한 줄에 표시
                 print(f'\r✅ 복사 완료: {total_copied}개 파일 ({filename})', end='')
-                filename_list.append(filename)
                 
             except Exception as e:
                     print(f"\n❌ 오류 발생 - 파일 복사 실패: {source_file_path} -> {e}")
@@ -213,14 +218,112 @@ def create_image_paths_txt(images_list, output_filename="paths.txt"):
         
     except Exception as e:
         print(f"❌ 파일 작성 중 오류 발생: {e}")
+ 
+# 목표 해상도 (가로, 세로)
+TARGET_SIZE = (640, 640) 
+
+def img_resize(target_dir) :
+        # TARGET_DIR 내의 모든 jpg 및 jpeg 파일 목록을 가져옵니다.
+        image_extensions = ('.jpg', '.jpeg') # 검색하려는 확장자들을 소문자로 정의
+
+        image_files = []
+        for filename in os.listdir(target_dir):
+            # 파일 확장자를 소문자로 변환하여 일치하는지 확인
+            if filename.lower().endswith(image_extensions):
+                file_path = os.path.join(target_dir, filename)
+                image_files.append(file_path)
+
+        total_images = len(image_files)
+
+        if total_images == 0:
+            print(f"❌ '{target_dir}' 경로에서 JPG/JPEG 파일을 찾을 수 없습니다.")
+        else:
+            print(f"총 {total_images}개의 이미지를 {TARGET_SIZE[0]}x{TARGET_SIZE[1]}로 리사이징 시작...")
+            
+            for i, file_path in enumerate(image_files):
+                # 덮어쓰기이므로 input_path와 output_path가 동일합니다.
+                output_path = file_path 
+                filename = os.path.basename(file_path)
+
+                try:
+                    img = cv2.imread(file_path)
+                    
+                    if img is None:
+                        print(f"  > 경고: '{filename}' 파일을 읽을 수 없습니다.")
+                        continue
+
+                    # 이미지 리사이징
+                    resized_img = cv2.resize(img, TARGET_SIZE, interpolation=cv2.INTER_LINEAR)
+                    
+                    # 원본 파일 경로에 덮어쓰기 저장
+                    cv2.imwrite(output_path, resized_img)
+
+                    if (i + 1) % 100 == 0 or (i + 1) == total_images:
+                        print(f"\r  > 진행률: {i + 1}/{total_images}개 이미지 덮어쓰기 완료.", end='')
+
+                except Exception as e:
+                    print(f"  > 오류 발생: '{filename}' 덮어쓰기 중 문제 발생: {e}")
+
+            print("-" * 40)
+            print("✅ 모든 이미지 파일 덮어쓰기 완료.") 
+
+def image_crack_remove(image_dir) :
+    deleted_files_count = 0
+    total_files = 0
+
+    print(f"--- 🚨 데이터셋 스캔 및 손상 파일 삭제 시작 ---")
+
+    for root, _, files in os.walk(image_dir):
+        for file in files:
+            if file.lower().endswith(('.jpg', '.jpeg')):
+                total_files += 1
+                file_path = os.path.join(root, file)
+                print(f'r\ {total_files} ing~~', end='')
+                
+                try:
+                    # 1. 이미지를 열고 파일 완전성을 확인
+                    img = Image.open(file_path)
+                    img.verify()
+                    
+                except Exception as e:
+                    # 2. 오류 발생 시 (손상된 파일)
+                    print(f"🚨 Corrupted file found and deleting: {file_path} - Error: {e}")
+                    
+                    try:
+                        # 3. 파일 삭제
+                        os.remove(file_path)
+                        deleted_files_count += 1
+                        print(f"   -> Successfully deleted.")
+                    except Exception as del_e:
+                        print(f"   -> ❌ Error deleting file: {file_path} - {del_e}")
+
+    print(f"\n--- Scan Complete ---")
+    print(f"Total files checked: {total_files}")
+    print(f"Total corrupted files deleted: {deleted_files_count}")
+
+    # 삭제된 파일이 있다면 정리 작업 완료 메시지 출력
+    if deleted_files_count > 0:
+        print("\n✅ 손상된 파일 정리가 완료되었습니다.") 
+
+def make_list(target_dir, filename_list) :
+    # os.walk를 사용하여 origin pathdhk 그 하위의 모든 폴더를 탐색합니다.
+    for root, dirs, files in os.walk(target_dir):
+        for filename in files:  
+            filename_list.append(filename)     
 
 def run(source_dir, target_dir, label_dir, output_dir, txt_filename):
     images_list = []
-    cp_file(source_dir, target_dir, images_list)
+    cp_file(source_dir, target_dir)
     print('image cp complate')
+    image_crack_remove(target_dir)
+    img_resize(target_dir)
+    print('image 640X640 complate')
+    make_list(target_dir, images_list)
+
     labels_list = []
-    cp_file(label_dir, output_dir, labels_list)
+    cp_file(label_dir, output_dir)
     print('label cp complate')
+    make_list(label_dir, labels_list)
 
     labels_list = sync_list_a_by_list_b(labels_list, images_list)
     images_list = sync_list_a_by_list_b(images_list, labels_list)
