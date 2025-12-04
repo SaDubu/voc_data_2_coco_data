@@ -2,7 +2,7 @@ import subprocess
 import os
 import sys
 
-# 실행할 스크립트 파일 목록 (순서대로)
+# 실행할 스크립트 파일 목록
 SCRIPTS = [
     'xml_path_set.py',
     'trans_coco.py',
@@ -18,24 +18,20 @@ def run_script(script_name):
     
     try:
         # subprocess.run을 사용하여 스크립트를 실행합니다.
-        # stdout=sys.stdout, stderr=sys.stderr 설정으로 자식 프로세스의 출력을
+        # stdout=sys.stdout, stderr=sys.stderr
         # 현재 CMD 창에 실시간으로 스트림합니다.
         result = subprocess.run(
             [sys.executable, script_name],
             check=True,
-            # 출력 캡처를 비활성화하고, 부모 프로세스의 스트림 사용
             stdout=sys.stdout,
             stderr=sys.stderr,
             text=True
         )
         
-        # subprocess.run이 check=True로 설정되어 있어, 오류 발생 시 예외가 발생하므로,
-        # 이 부분이 실행되면 성공으로 간주합니다.
         print(f"\n✅ 스크립트 실행 성공: {script_name}")
         return True
         
     except subprocess.CalledProcessError as e:
-        # check=True 때문에 비정상 종료 시 이 예외가 잡힙니다.
         print(f"\n❌ 오류 발생: {script_name}이(가) 비정상 종료되었습니다. (Exit Code: {e.returncode})")
         return False
         

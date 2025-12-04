@@ -1,6 +1,8 @@
 import os
 import yaml
+import shutil
 from typing import List
+from pathlib import Path
 
 # --- [Configuration Section] ---
 # 1. 'label' 폴더와 'image' 폴더가 들어있는 최상위 폴더 경로
@@ -61,11 +63,103 @@ def is_same_list(list_a, list_b) :
     if len_a != len_b :
         return False
     
+    len_a = len(list_a)
+    len_b = len(list_b)
+
     for i in range (len_a) :
         if list_a[i] == list_b[i] :
             continue
         return False 
     return True
+
+def long_list(list_a, list_b) :
+    list_t = None
+    list_s = None
+    len_a = len(list_a)
+    len_b = len(list_b)
+
+    if len_a > len_b :
+        list_t = list_a
+        list_s = list_b
+    elif len_a < len_b :
+        list_t = list_b
+        list_s = list_a
+    
+    return list_t, list_s
+
+def find_folders_to_delete(root_dir, target_list):
+    """
+    ROOT_DIR 직계 하위 폴더 중 이름이 조건에 맞는 폴더를 찾습니다.
+    """
+    folders_to_delete = []
+
+    print(f"--- [탐색 시작] {root_dir} 폴더 내부 검사 ---")
+
+    # image와 label 폴더 경로 설정
+    image_dir = Path(root_dir) / 'image'
+    label_dir = Path(root_dir) / 'label'
+    label_coco_dir = Path(root_dir) / 'label_coco'
+    
+    # 검사할 디렉토리 리스트
+    search_dirs = [image_dir, label_dir, label_coco_dir]
+
+    print("--- [탐색 시작] image/ label/ label_coco/ 폴더 검사 ---")
+    
+    for current_search_dir in search_dirs:
+        if not current_search_dir.is_dir():
+            print(f"⚠️ 경고: {current_search_dir} 경로를 찾을 수 없습니다. 건너뜁니다.")
+            continue
+            
+        print(f"🔎 {current_search_dir} 폴더 내부를 검사합니다...")
+
+        now_path = Path(current_search_dir)
+    
+        for item_name in os.listdir(now_path):
+            # 1. 전체 경로 생성
+            full_path = now_path / item_name
+            
+            # 2. 파일이 아닌 '디렉토리(폴더)'인지 확인
+            if full_path.is_dir():
+                
+                # 3. 폴더 이름에서 첫 번째 '_'를 기준으로 분리
+                parts = item_name.split('_', 1)
+                
+                # 언더바가 있고, 그 뒤에 문자열이 있을 경우만 검사
+                if len(parts) == 2 and parts[1] != '':
+                    suffix = parts[1] # 접미사 (예: '4' 또는 '5')
+                    
+                    # 4. 접미사(suffix)가 target_list에 있는지 확인
+                    if suffix in target_list:
+                        print(f"✅ 삭제 대상 폴더 발견: {full_path}")
+                        folders_to_delete.append(str(full_path))
+    
+    return folders_to_delete
+
+def execute_deletion(folders_to_delete):
+    """
+    폴더 리스트에 있는 모든 폴더와 그 내용을 삭제합니다.
+    """
+    if not folders_to_delete:
+        print("삭제할 대상 폴더가 없습니다.")
+        return
+
+    print("\n--- [위험] 실제 폴더 삭제를 시작합니다 ---")
+    
+    for folder_path in folders_to_delete:
+        try:
+            # rmtree는 폴더와 그 안의 모든 파일/폴더를 재귀적으로 삭제합니다.
+            shutil.rmtree(folder_path)
+            print(f"🗑️ 성공적으로 삭제됨: {folder_path}")
+        except Exception as e:
+            print(f"❌ 삭제 실패 ({folder_path}): {e}")
+
+def difference_data(list_a, list_b) :
+    c = set(list_a).difference(set(list_b))
+    list_c = list(c)
+
+    list_c = [item.strip() for item in list_c]
+    
+    return list_c
 
 def write_data_yaml(
     classes_list: List[str], 
@@ -82,9 +176,10 @@ def write_data_yaml(
         train_file (str): 훈련용 이미지/라벨 목록 파일. 기본값은 'train.txt'.
         val_file (str): 검증용 이미지/라벨 목록 파일. 기본값은 'valid.txt'.
     """
+
+    classes_list = [item.strip() for item in classes_list]
     
     # 1. 'names' 딕셔너리 생성
-    # 클래스 리스트를 순회하며 인덱스(0부터 시작)를 키로, 클래스 이름을 값으로 하는 딕셔너리를 만듭니다.
     names_dict = {i: name for i, name in enumerate(classes_list)}
     
     # 2. nc (Number of Classes) 설정
@@ -119,9 +214,11 @@ if __name__ == '__main__':
     get_classes_list(V_FILE_PATH, v_label_list)
 
     if not(is_same_list(label_list, v_label_list)) :
-        print('classes file error, please check file')
-        print(f'Train classes file {FILE_PATH}')
-        print(f'valid classes file {V_FILE_PATH}')
-        exit()
+        list_a, list_b = long_list(label_list, v_label_list)
+        list_c = difference_data(list_a, list_b)
+        remove_folder = find_folders_to_delete(BASE_DIR, list_c)
+        execute_deletion(remove_folder)
+        remove_folder = find_folders_to_delete(V_BASE_DIR, list_c)
+        execute_deletion(remove_folder)
 
     write_data_yaml(label_list)
