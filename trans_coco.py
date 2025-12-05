@@ -2,6 +2,9 @@ import xml.etree.ElementTree as ET
 import os
 import shutil
 
+import create_data_yaml as cdy
+import coco_setting_train as cst
+
 # --- [Configuration Section] ---
 # 1. 'label' 폴더와 'image' 폴더가 들어있는 최상위 폴더 경로
 BASE_DIR = './Training' 
@@ -132,7 +135,7 @@ def process_conversion(xml_file_path, output_dir, classes_list):
     except Exception as e:
         print(f"[오류] 파일 처리 실패 ({xml_file_path}): {e}")
 
-def run(label_dir, ouput_dir, base_dir) :
+def create_classes_file(label_dir, base_dir) :
     # 1. XML 스캔 및 CLASSES 리스트 동적 생성
     #CLASSES = find_all_unique_classes(LABEL_ROOT_DIR)
     classes = find_classes_from_folder_name(label_dir)
@@ -149,7 +152,12 @@ def run(label_dir, ouput_dir, base_dir) :
         
     except Exception as e:
         print(f"❌ classes.txt 파일 저장 중 오류 발생: {e}")
-    
+
+    return classes
+
+def run(label_dir, ouput_dir, base_dir) :  
+    classe_label = create_classes_file(label_dir, base_dir)
+
     print(f"\n--- XML to YOLO TXT 변환 시작 ---")
     print(f"입력 경로: {label_dir}")
     print(f"출력 경로: {ouput_dir}")
@@ -175,7 +183,7 @@ def run(label_dir, ouput_dir, base_dir) :
 
                 xml_file_path = os.path.join(root_dir, filename)
                 # 동적 생성된 CLASSES 리스트를 process_conversion 함수에 전달
-                process_conversion(xml_file_path, current_output_dir, classes) 
+                process_conversion(xml_file_path, current_output_dir, classe_label) 
                 total_files += 1
 
                 print(f'\r {total_files} ing ~~~', end='')
@@ -183,5 +191,16 @@ def run(label_dir, ouput_dir, base_dir) :
     print(f"\n--- 총 {total_files}개의 XML 파일이 YOLO TXT로 변환 완료되었습니다. ---")
 # --- [Main Execution Loop] ---
 if __name__ == '__main__':
+    label_list = create_classes_file(LABEL_ROOT_DIR, BASE_DIR)
+    v_label_list = create_classes_file(V_LABEL_ROOT_DIR, V_BASE_DIR)
+
+    if not(cdy.is_same_list(label_list, v_label_list)) :
+        list_a, list_b = cdy.long_list(label_list, v_label_list)
+        list_c = cdy.difference_data(list_a, list_b)
+        remove_folder = cdy.find_folders_to_delete(BASE_DIR, list_c)
+        cdy.execute_deletion(remove_folder)
+        remove_folder = cdy.find_folders_to_delete(V_BASE_DIR, list_c)
+        cdy.execute_deletion(remove_folder)
+
     run(LABEL_ROOT_DIR, OUTPUT_ROOT_DIR, BASE_DIR)
     run(V_LABEL_ROOT_DIR, V_OUTPUT_ROOT_DIR, V_BASE_DIR)

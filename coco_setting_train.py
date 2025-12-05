@@ -267,44 +267,6 @@ def img_resize(target_dir) :
             print("-" * 40)
             print("✅ 모든 이미지 파일 덮어쓰기 완료.") 
 
-def image_crack_remove(image_dir) :
-    deleted_files_count = 0
-    total_files = 0
-
-    print(f"--- 🚨 데이터셋 스캔 및 손상 파일 삭제 시작 ---")
-
-    for root, _, files in os.walk(image_dir):
-        for file in files:
-            if file.lower().endswith(('.jpg', '.jpeg')):
-                total_files += 1
-                file_path = os.path.join(root, file)
-                print(f'r\ {total_files} ing~~', end='')
-                
-                try:
-                    # 1. 이미지를 열고 파일 완전성을 확인
-                    img = Image.open(file_path)
-                    img.verify()
-                    
-                except Exception as e:
-                    # 2. 오류 발생 시 (손상된 파일)
-                    print(f"🚨 Corrupted file found and deleting: {file_path} - Error: {e}")
-                    
-                    try:
-                        # 3. 파일 삭제
-                        os.remove(file_path)
-                        deleted_files_count += 1
-                        print(f"   -> Successfully deleted.")
-                    except Exception as del_e:
-                        print(f"   -> ❌ Error deleting file: {file_path} - {del_e}")
-
-    print(f"\n--- Scan Complete ---")
-    print(f"Total files checked: {total_files}")
-    print(f"Total corrupted files deleted: {deleted_files_count}")
-
-    # 삭제된 파일이 있다면 정리 작업 완료 메시지 출력
-    if deleted_files_count > 0:
-        print("\n✅ 손상된 파일 정리가 완료되었습니다.") 
-
 def make_list(target_dir, filename_list) :
     # os.walk를 사용하여 origin pathdhk 그 하위의 모든 폴더를 탐색합니다.
     for root, dirs, files in os.walk(target_dir):
@@ -315,7 +277,6 @@ def run(source_dir, target_dir, label_dir, output_dir, txt_filename):
     images_list = []
     cp_file(source_dir, target_dir)
     print('image cp complate')
-    image_crack_remove(target_dir)
     img_resize(target_dir)
     print('image 640X640 complate')
     make_list(target_dir, images_list)
